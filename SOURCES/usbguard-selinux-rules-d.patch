@@ -1,0 +1,22 @@
+From 008af22f238bfb97f6d337759732ac87bdef7b24 Mon Sep 17 00:00:00 2001
+From: alakatos <alakatos@redhat.com>
+Date: Mon, 25 May 2020 15:27:38 +0200
+Subject: [PATCH] /etc/usrbuard/rules.d(/.*)? has usbguard_rules_t label right
+ after the installation
+
+---
+ usbguard.fc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/usbguard.fc b/usbguard.fc
+index bce3e8c..3e14720 100644
+--- a/usbguard-selinux-0.0.3/usbguard.fc
++++ b/usbguard-selinux-0.0.3/usbguard.fc
+@@ -13,6 +13,7 @@
+ # You should have received a copy of the GNU General Public License
+ # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
++/etc/usbguard/rules\.d(/.*)?                 gen_context(system_u:object_r:usbguard_rules_t,s0)
+ /etc/usbguard/rules.conf                  -- gen_context(system_u:object_r:usbguard_rules_t,s0)
+ /etc/usbguard(/.*)?                          gen_context(system_u:object_r:usbguard_conf_t,s0)
+ /dev/shm/qb-usbguard-.*                   -- gen_context(system_u:object_r:usbguard_tmpfs_t,s0)

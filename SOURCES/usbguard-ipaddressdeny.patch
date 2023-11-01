@@ -1,0 +1,11 @@
+diff --color -ru a/usbguard.service.in b/usbguard.service.in
+--- a/usbguard.service.in	2021-09-07 16:33:49.911540537 +0200
++++ b/usbguard.service.in	2021-09-07 16:37:20.788885123 +0200
+@@ -8,7 +8,6 @@
+ CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER CAP_AUDIT_WRITE
+ DevicePolicy=closed
+ ExecStart=%sbindir%/usbguard-daemon -f -s -c %sysconfdir%/usbguard/usbguard-daemon.conf
+-IPAddressDeny=any
+ LockPersonality=yes
+ MemoryDenyWriteExecute=yes
+ NoNewPrivileges=yes
