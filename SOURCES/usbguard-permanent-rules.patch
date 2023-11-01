@@ -1,0 +1,68 @@
+diff -up usbguard-1.0.0/doc/man/usbguard-daemon.conf.5.adoc.orig usbguard-1.0.0/doc/man/usbguard-daemon.conf.5.adoc
+--- usbguard-1.0.0/doc/man/usbguard-daemon.conf.5.adoc.orig	2023-01-05 10:58:24.684407437 +0100
++++ usbguard-1.0.0/doc/man/usbguard-daemon.conf.5.adoc	2023-01-05 10:58:42.323426745 +0100
+@@ -27,7 +27,12 @@ It may be overridden using the *-c* comm
+     behave like any other standard Linux daemon therefore it loads rule files in
+     alpha-numeric order. File names inside `RuleFolder` directory should start
+     with a two-digit number prefix indicating the position, in which the rules
+-    are scanned by the daemon.
++    are scanned by the daemon. Using RuleFile and RuleFolder at the same time is
++    permitted. However, modification of the permanent policy is not possible if
++    one of the following conditions are met:
++    ** Neither RuleFile nor RuleFolder are specified.
++    ** RuleFile is not specified, RuleFolder is but it does not contain any files,
++       where we could save permanent rules.
+ 
+ *ImplicitPolicyTarget*='target'::
+     How to treat USB devices that don't match any rule in the policy. Target
+diff -up usbguard-1.0.0/src/Daemon/Daemon.cpp.orig usbguard-1.0.0/src/Daemon/Daemon.cpp
+--- usbguard-1.0.0/src/Daemon/Daemon.cpp.orig	2023-01-05 10:58:49.689434809 +0100
++++ usbguard-1.0.0/src/Daemon/Daemon.cpp	2023-01-05 10:59:18.991466884 +0100
+@@ -742,7 +742,7 @@ namespace usbguard
+     /* TODO: reevaluate the firewall rules for all active devices */
+     const uint32_t id = _policy.appendRule(rule, parent_id);
+ 
+-    if (_config.hasSettingValue("RuleFile") && permanent) {
++    if ((_config.hasSettingValue("RuleFile") || _config.hasSettingValue("RuleFolder")) && permanent) {
+       _policy.save();
+     }
+ 
+@@ -755,7 +755,7 @@ namespace usbguard
+     USBGUARD_LOG(Trace) << "id=" << id;
+     _policy.removeRule(id);
+ 
+-    if (_config.hasSettingValue("RuleFile")) {
++    if (_config.hasSettingValue("RuleFile") || _config.hasSettingValue("RuleFolder")) {
+       _policy.save();
+     }
+   }
+diff -up usbguard-1.0.0/src/Daemon/RuleSetFactory.cpp.orig usbguard-1.0.0/src/Daemon/RuleSetFactory.cpp
+--- usbguard-1.0.0/src/Daemon/RuleSetFactory.cpp.orig	2023-01-05 10:59:27.117475780 +0100
++++ usbguard-1.0.0/src/Daemon/RuleSetFactory.cpp	2023-01-05 10:59:46.228496702 +0100
+@@ -75,8 +75,24 @@ namespace usbguard
+         }
+       }
+ 
+-      if (ruleSet.empty()){
+-        USBGUARD_LOG(Warning) << "Neither RuleFile nor RuleFolder are set; Modification of the permanent policy won't be possible.";
++      /*
++       * This means one of the following:
++       *  - Neither RuleFile nor RuleFolder are specified
++       *  - RuleFile not specified, RuleFolder is but it does not contain any files,
++       *    where we could save permanent rules
++       */
++      if (ruleSet.empty()) {
++        std::string msg;
++
++        if (ns.getRulesPath().empty() && ns.getRulesDirPath().empty()) {
++          msg = "Neither RuleFile nor RuleFolder are set.";
++        }
++        else {
++          msg = "RuleFile is not set, RuleFolder is but it does not contain any rule files.";
++        }
++
++        USBGUARD_LOG(Warning) << "Modification of the permanent policy won't be possible."
++          << " Reason: " << msg;
+         ruleSet = generateDefaultRuleSet();
+       }
+ 

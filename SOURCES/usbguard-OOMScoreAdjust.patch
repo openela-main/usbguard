@@ -1,0 +1,11 @@
+diff -up usbguard-1.0.0/usbguard.service.in.orig usbguard-1.0.0/usbguard.service.in
+--- usbguard-1.0.0/usbguard.service.in.orig	2022-11-28 10:21:35.889977314 +0100
++++ usbguard-1.0.0/usbguard.service.in	2022-11-28 10:21:52.711987716 +0100
+@@ -4,6 +4,7 @@ Wants=systemd-udevd.service local-fs.tar
+ Documentation=man:usbguard-daemon(8)
+ 
+ [Service]
++OOMScoreAdjust=-1000
+ AmbientCapabilities=
+ CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER CAP_AUDIT_WRITE
+ DevicePolicy=closed

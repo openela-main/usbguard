@@ -1,0 +1,12 @@
+diff -up usbguard-1.0.0/usbguard.service.in.orig usbguard-1.0.0/usbguard.service.in
+--- usbguard-1.0.0/usbguard.service.in.orig	2023-01-12 13:22:23.032554498 +0100
++++ usbguard-1.0.0/usbguard.service.in	2023-01-12 13:22:33.082568210 +0100
+@@ -8,7 +8,7 @@ OOMScoreAdjust=-1000
+ AmbientCapabilities=
+ CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER CAP_AUDIT_WRITE
+ DevicePolicy=closed
+-ExecStart=%sbindir%/usbguard-daemon -f -s -c %sysconfdir%/usbguard/usbguard-daemon.conf
++ExecStart=%sbindir%/usbguard-daemon -f -s -K -c %sysconfdir%/usbguard/usbguard-daemon.conf
+ IPAddressDeny=any
+ LockPersonality=yes
+ MemoryDenyWriteExecute=yes

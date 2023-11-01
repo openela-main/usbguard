@@ -1,0 +1,12 @@
+diff -up usbguard-1.0.0/usbguard-selinux-0.0.4/usbguard.te.orig usbguard-1.0.0/usbguard-selinux-0.0.4/usbguard.te
+--- usbguard-1.0.0/usbguard-selinux-0.0.4/usbguard.te.orig	2021-03-23 10:32:56.239139027 +0100
++++ usbguard-1.0.0/usbguard-selinux-0.0.4/usbguard.te	2021-03-23 10:33:05.718229143 +0100
+@@ -68,7 +68,7 @@ files_pid_file(usbguard_var_run_t)
+ # Local policy
+ #
+ 
+-allow usbguard_t self:capability { chown fowner };
++allow usbguard_t self:capability { chown fowner audit_write };
+ allow usbguard_t self:netlink_kobject_uevent_socket { bind create setopt read };
+ allow usbguard_t self:netlink_audit_socket { nlmsg_relay create_netlink_socket_perms };
+ 
