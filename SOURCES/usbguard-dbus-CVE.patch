@@ -1,0 +1,335 @@
+diff -up usbguard-1.0.0/configure.ac.orig usbguard-1.0.0/configure.ac
+--- usbguard-1.0.0/configure.ac.orig	2022-08-16 10:24:34.345570913 +0200
++++ usbguard-1.0.0/configure.ac	2022-08-16 10:24:34.307571236 +0200
+@@ -399,7 +399,7 @@ if test "x$with_dbus" = xyes; then
+   #
+   # Check for required D-Bus modules
+   #
+-  PKG_CHECK_MODULES([dbus], [dbus-1 gio-2.0],
++  PKG_CHECK_MODULES([dbus], [dbus-1 gio-2.0 polkit-gobject-1],
+   [AC_DEFINE([HAVE_DBUS], [1], [Required GDBus API available])
+   dbus_summary="system-wide; $dbus_CFLAGS $dbus_LIBS"],
+   [AC_MSG_FAILURE([Required D-Bus modules (dbus-1, gio-2.0) not found!])]
+diff -up usbguard-1.0.0/src/DBus/DBusBridge.cpp.orig usbguard-1.0.0/src/DBus/DBusBridge.cpp
+--- usbguard-1.0.0/src/DBus/DBusBridge.cpp.orig	2022-08-16 10:24:34.312571194 +0200
++++ usbguard-1.0.0/src/DBus/DBusBridge.cpp	2022-08-16 10:28:28.595587136 +0200
+@@ -21,6 +21,8 @@
+ #endif
+ 
+ #include "DBusBridge.hpp"
++#include <polkit/polkit.h>
++
+ namespace usbguard
+ {
+   DBusBridge::DBusBridge(GDBusConnection* const gdbus_connection,
+@@ -74,9 +76,19 @@ namespace usbguard
+     return;
+   }
+ 
++  #define DBUS_AUTH_CHECK \
++      GDBusError authErrorCode = G_DBUS_ERROR_FAILED; \
++      const gchar* authErrorMessage = NULL; \
++      if (! isAuthorizedByPolkit(invocation, &authErrorCode, &authErrorMessage)) { \
++        g_dbus_method_invocation_return_error_literal(invocation, G_DBUS_ERROR, authErrorCode, authErrorMessage); \
++        return; \
++      }
++
+   void DBusBridge::handleRootMethodCall(const std::string& method_name, GVariant* parameters, GDBusMethodInvocation* invocation)
+   {
+     if (method_name == "getParameter") {
++      DBUS_AUTH_CHECK
++
+       const char* name_cstr = nullptr;
+       g_variant_get(parameters, "(&s)", &name_cstr);
+       std::string name(name_cstr);
+@@ -86,6 +98,8 @@ namespace usbguard
+     }
+ 
+     if (method_name == "setParameter") {
++      DBUS_AUTH_CHECK
++
+       const char* name_cstr = nullptr;
+       const char* value_cstr = nullptr;
+       g_variant_get(parameters, "(&s&s)", &name_cstr, &value_cstr);
+@@ -104,6 +118,8 @@ namespace usbguard
+   void DBusBridge::handlePolicyMethodCall(const std::string& method_name, GVariant* parameters, GDBusMethodInvocation* invocation)
+   {
+     if (method_name == "listRules") {
++      DBUS_AUTH_CHECK
++
+       const char* label_cstr = nullptr;
+       g_variant_get(parameters, "(&s)", &label_cstr);
+       std::string label(label_cstr);
+@@ -136,6 +152,8 @@ namespace usbguard
+     }
+ 
+     if (method_name == "appendRule") {
++      DBUS_AUTH_CHECK
++
+       const char* rule_spec_cstr = nullptr;
+       uint32_t parent_id = 0;
+       gboolean temporary = false;
+@@ -147,6 +165,8 @@ namespace usbguard
+     }
+ 
+     if (method_name == "removeRule") {
++      DBUS_AUTH_CHECK
++
+       uint32_t rule_id = 0;
+       g_variant_get(parameters, "(u)", &rule_id);
+       removeRule(rule_id);
+@@ -163,6 +183,8 @@ namespace usbguard
+     GDBusMethodInvocation* invocation)
+   {
+     if (method_name == "listDevices") {
++      DBUS_AUTH_CHECK
++
+       const char* query_cstr = nullptr;
+       g_variant_get(parameters, "(&s)", &query_cstr);
+       std::string query(query_cstr);
+@@ -195,6 +217,8 @@ namespace usbguard
+     }
+ 
+     if (method_name == "applyDevicePolicy") {
++      DBUS_AUTH_CHECK
++
+       uint32_t device_id = 0;
+       uint32_t target_integer = 0;
+       gboolean permanent = false;
+@@ -344,6 +368,135 @@ namespace usbguard
+ 
+     return builder;
+   }
++
++  std::string DBusBridge::formatGError(GError* error)
++  {
++    if (error) {
++      std::stringstream formatGError;
++      formatGError << error->message << " (code " << error->code << ")";
++      return formatGError.str();
++    }
++    else {
++      return "unknown error";
++    }
++  }
++
++  bool DBusBridge::isAuthorizedByPolkit(GDBusMethodInvocation* invocation, GDBusError* authErrorCode,
++    const gchar** authErrorMessage)
++  {
++    GError* error = NULL;
++    USBGUARD_LOG(Trace) << "Extracting bus name...";
++    const gchar* const /*no-free!*/ bus_name = g_dbus_method_invocation_get_sender (invocation);
++
++    if (! bus_name) {
++      USBGUARD_LOG(Trace) << "Failed to extract bus name.";
++      *authErrorCode = G_DBUS_ERROR_AUTH_FAILED;
++      *authErrorMessage = "Failed to extract bus name.";
++      return false;
++    }
++
++    USBGUARD_LOG(Trace) << "Extracted bus name \"" << bus_name << "\".";
++    USBGUARD_LOG(Trace) << "Extracting interface name...";
++    const gchar* const /*no-free!*/ interfaceName = g_dbus_method_invocation_get_interface_name(invocation);
++
++    if (! interfaceName) {
++      USBGUARD_LOG(Trace) << "Failed to extract interface name.";
++      *authErrorCode = G_DBUS_ERROR_AUTH_FAILED;
++      *authErrorMessage = "Failed to extract interface name.";
++      return false;
++    }
++
++    USBGUARD_LOG(Trace) << "Extracted interface name \"" << interfaceName << "\".";
++    USBGUARD_LOG(Trace) << "Extracting method name...";
++    const gchar* const /*no-free!*/ methodName = g_dbus_method_invocation_get_method_name(invocation);
++
++    if (! methodName) {
++      USBGUARD_LOG(Trace) << "Failed to extract method name.";
++      *authErrorCode = G_DBUS_ERROR_AUTH_FAILED;
++      *authErrorMessage = "Failed to extract method name.";
++      return false;
++    }
++
++    std::stringstream action_id;
++    action_id << interfaceName << "." << methodName;
++    USBGUARD_LOG(Trace) << "Extracted method name \"" << methodName << "\".";
++    USBGUARD_LOG(Trace) << "Creating a system bus Polkit subject...";
++    PolkitSubject* const subject = polkit_system_bus_name_new(bus_name);
++
++    if (! subject) {
++      USBGUARD_LOG(Trace) << "Failed to create Polkit subject.";
++      *authErrorCode = G_DBUS_ERROR_AUTH_FAILED;
++      *authErrorMessage = "Failed to create Polkit subject.";
++      return false;
++    }
++
++    USBGUARD_LOG(Trace) << "Created.";
++    USBGUARD_LOG(Trace) << "Connecting with Polkit authority...";
++    PolkitAuthority* const authority = polkit_authority_get_sync(/*cancellable=*/ NULL, &error);
++
++    if (! authority || error) {
++      USBGUARD_LOG(Trace) << "Failed to connect to Polkit authority: " << formatGError(error) << ".";
++      *authErrorCode = G_DBUS_ERROR_AUTH_FAILED;
++      *authErrorMessage = "Failed to connect to Polkit authority";
++      g_error_free(error);
++      g_object_unref(authority);
++      g_object_unref(subject);
++      return false;
++    }
++
++    USBGUARD_LOG(Trace) << "Connected.";
++    USBGUARD_LOG(Trace) << "Customizing Polkit authentification dialog...";
++    PolkitDetails* const details = polkit_details_new();
++
++    if (! details) {
++      USBGUARD_LOG(Trace) << "Failed to customize the Polkit authentification dialog.";
++      *authErrorCode = G_DBUS_ERROR_AUTH_FAILED;
++      *authErrorMessage = "Failed to customize the Polkit authentication dialog.";
++      g_object_unref(authority);
++      g_object_unref(subject);
++      return false;
++    }
++
++    polkit_details_insert (details, "polkit.message", "This USBGuard action needs authorization");
++    USBGUARD_LOG(Trace) << "Customized.";
++    USBGUARD_LOG(Trace) << "Checking authorization of action \"" << action_id.str() << "\" with Polkit ...";
++    const PolkitCheckAuthorizationFlags flags = POLKIT_CHECK_AUTHORIZATION_FLAGS_ALLOW_USER_INTERACTION;
++    PolkitAuthorizationResult* const result = polkit_authority_check_authorization_sync
++      (authority,
++        subject,
++        action_id.str().c_str(),
++        details,
++        flags,
++        /*cancellable=*/ NULL,
++        &error);
++
++    if (! result || error) {
++      USBGUARD_LOG(Trace) << "Failed to check back with Polkit for authoriation: " << formatGError(error) << ".";
++      *authErrorCode = G_DBUS_ERROR_AUTH_FAILED;
++      *authErrorMessage = "Failed to check back with Polkit for authoriation.";
++      g_error_free(error);
++      g_object_unref(result);
++      g_object_unref(details);
++      g_object_unref(authority);
++      g_object_unref(subject);
++      return false;
++    }
++
++    gboolean isAuthorized = polkit_authorization_result_get_is_authorized(result);
++    USBGUARD_LOG(Trace) << (isAuthorized ? "Authorized" : "Not authorized") << ".";
++
++    if (! isAuthorized) {
++      *authErrorCode = G_DBUS_ERROR_ACCESS_DENIED;
++      *authErrorMessage = "Not authorized.";
++    }
++
++    g_object_unref(result);
++    g_object_unref(details);
++    g_object_unref(authority);
++    g_object_unref(subject);
++    return isAuthorized;
++  }
++
+ } /* namespace usbguard */
+ 
+ /* vim: set ts=2 sw=2 et */
+diff -up usbguard-1.0.0/src/DBus/DBusBridge.hpp.orig usbguard-1.0.0/src/DBus/DBusBridge.hpp
+--- usbguard-1.0.0/src/DBus/DBusBridge.hpp.orig	2022-08-16 10:24:34.312571194 +0200
++++ usbguard-1.0.0/src/DBus/DBusBridge.hpp	2022-08-16 10:28:33.514545528 +0200
+@@ -83,6 +83,9 @@ namespace usbguard
+       bool rule_match,
+       uint32_t rule_id);
+ 
++    static std::string formatGError(GError* error);
++    static bool isAuthorizedByPolkit(GDBusMethodInvocation* invocation, GDBusError* authErrorCode,
++    const gchar** authErrorMessage);
+ 
+     GDBusConnection* const p_gdbus_connection;
+     void(*p_ipc_callback)(bool);
+diff -up usbguard-1.0.0/src/DBus/org.usbguard1.policy.orig usbguard-1.0.0/src/DBus/org.usbguard1.policy
+--- usbguard-1.0.0/src/DBus/org.usbguard1.policy.orig	2022-08-16 10:24:34.312571194 +0200
++++ usbguard-1.0.0/src/DBus/org.usbguard1.policy	2022-08-16 10:24:34.311571202 +0200
+@@ -1,23 +1,23 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+         "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+-        
++
+ <policyconfig>
+   <vendor>The USBGuard Project</vendor>
+   <vendor_url>https://github.org/USBGuard/usbguard</vendor_url>
+ 
+   <action id="org.usbguard.Policy1.listRules">
+     <description>List the rule set (policy) used by the USBGuard daemon</description>
+-    <message>Prevents from listing the USBGuard policy</message>
++    <message>Prevents listing the USBGuard policy</message>
+     <defaults>
+       <allow_inactive>no</allow_inactive>
+-      <allow_active>auth_self_keep_session</allow_active>
++      <allow_active>yes</allow_active>
+     </defaults>
+   </action>
+ 
+   <action id="org.usbguard.Policy1.appendRule">
+     <description>Append a new rule to the policy</description>
+-    <message>Prevents from appending rules to the USBGuard policy</message>
++    <message>Prevents appending rules to the USBGuard policy</message>
+     <defaults>
+       <allow_inactive>no</allow_inactive>
+       <allow_active>auth_admin</allow_active>
+@@ -33,40 +33,41 @@
+     </defaults>
+   </action>
+ 
+-  <action id="org.usbguard.Devices1.listDevices">
+-    <description>List all USB devices recognized by the USBGuard daemon</description>
+-    <message>Prevents from listing USB devices recognized by the USBGuard daemon</message>
++  <action id="org.usbguard.Devices1.applyDevicePolicy">
++    <description>Apply a policy to a device in USBGuard</description>
++    <message>Prevents applying a policy to a device in USBGuard</message>
+     <defaults>
+       <allow_inactive>no</allow_inactive>
+-      <allow_active>auth_self_keep_session</allow_active>
++      <allow_active>auth_admin</allow_active>
+     </defaults>
+   </action>
+ 
+-  <action id="org.usbguard.Devices1.allowDevice">
+-    <description>Authorize a USB device via the USBGuard daemon to interact with the system</description>
+-    <message>Prevents from authorizing USB devices via the USBGuard daemon</message>
++  <action id="org.usbguard.Devices1.listDevices">
++    <description>List all USB devices recognized by the USBGuard daemon</description>
++    <message>Prevents listing USB devices recognized by the USBGuard daemon</message>
+     <defaults>
+       <allow_inactive>no</allow_inactive>
+-      <allow_active>auth_admin</allow_active>
++      <allow_active>yes</allow_active>
+     </defaults>
+   </action>
+ 
+-  <action id="org.usbguard.Devices1.blockDevice">
+-    <description>Deauthorize a USB device via the USBGuard daemon</description>
+-    <message>Prevents from deauthorizing USB devices via the USBGuard daemon</message>
++  <action id="org.usbguard1.getParameter">
++    <description>Get the value of a runtime parameter</description>
++    <message>Prevents getting values of runtime USBGuard parameters</message>
+     <defaults>
+       <allow_inactive>no</allow_inactive>
+-      <allow_active>auth_admin</allow_active>
++      <allow_active>yes</allow_active>
+     </defaults>
+   </action>
+ 
+-  <action id="org.usbguard.Devices1.rejectDevice">
+-    <description>Remove a USB device via the USBGuard daemon</description>
+-    <message>Prevents from removing USB devices via the USBGuard daemon</message>
++  <action id="org.usbguard1.setParameter">
++    <description>Set the value of a runtime parameter</description>
++    <message>Prevents setting values of runtime USBGuard parameters</message>
+     <defaults>
+       <allow_inactive>no</allow_inactive>
+       <allow_active>auth_admin</allow_active>
+     </defaults>
+   </action>
++
+ </policyconfig>
+ 

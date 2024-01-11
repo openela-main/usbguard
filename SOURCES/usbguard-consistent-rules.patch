@@ -1,0 +1,12 @@
+diff -up usbguard-1.0.0/src/Daemon/RuleSetFactory.cpp.orig usbguard-1.0.0/src/Daemon/RuleSetFactory.cpp
+--- usbguard-1.0.0/src/Daemon/RuleSetFactory.cpp.orig	2022-11-28 10:35:44.052560664 +0100
++++ usbguard-1.0.0/src/Daemon/RuleSetFactory.cpp	2022-11-28 10:35:55.510568939 +0100
+@@ -76,7 +76,7 @@ namespace usbguard
+       }
+ 
+       if (ruleSet.empty()){
+-        USBGUARD_LOG(Warning) << "RuleFile not set; Modification of the permanent policy won't be possible.";
++        USBGUARD_LOG(Warning) << "Neither RuleFile nor RuleFolder are set; Modification of the permanent policy won't be possible.";
+         ruleSet = generateDefaultRuleSet();
+       }
+ 

@@ -1,0 +1,19 @@
+diff -up usbguard-1.0.0/src/Daemon/Daemon.cpp.orig usbguard-1.0.0/src/Daemon/Daemon.cpp
+--- usbguard-1.0.0/src/Daemon/Daemon.cpp.orig	2022-11-28 10:25:01.044104150 +0100
++++ usbguard-1.0.0/src/Daemon/Daemon.cpp	2022-11-28 10:25:34.736124980 +0100
+@@ -40,6 +40,7 @@
+ #include <sys/types.h>
+ #include <sys/poll.h>
+ #include <unistd.h>
++#include <sys/wait.h>
+ #include <signal.h>
+ #include <string.h>
+ #include <sys/stat.h>
+@@ -606,6 +607,7 @@ namespace usbguard
+         const int signum = sigtimedwait(&mask, &info, &timeout);
+ 
+         if (signum == SIGUSR1 && info.si_signo == SIGUSR1 && info.si_pid == pid) {
++          waitpid(pid, nullptr, 0);
+           USBGUARD_LOG(Trace) << "Finished daemonization";
+           exit(EXIT_SUCCESS);
+         }

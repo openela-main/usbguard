@@ -1,0 +1,105 @@
+diff --color -ru a/doc/man/usbguard.1.adoc b/doc/man/usbguard.1.adoc
+--- a/doc/man/usbguard.1.adoc	2020-11-23 15:56:12.977847682 +0100
++++ b/doc/man/usbguard.1.adoc	2021-10-14 12:39:11.949947187 +0200
+@@ -282,6 +282,7 @@
+ ....
+ 
+ Consult the usbguard-daemon.conf(5) man-page for a detailed list of available privileges in each section.
++You can also use 'ALL' instead of 'privileges' to automatically assign all relevant privileges to a given section.
+ 
+ 
+ === *remove-user* 'name' ['OPTIONS']
+diff --color -ru a/doc/man/usbguard-daemon.conf.5.adoc b/doc/man/usbguard-daemon.conf.5.adoc
+--- a/doc/man/usbguard-daemon.conf.5.adoc	2020-11-23 15:56:12.977847682 +0100
++++ b/doc/man/usbguard-daemon.conf.5.adoc	2021-10-14 12:39:11.953947259 +0200
+@@ -162,6 +162,8 @@
+ 
+  ** list: Get values of run-time parameters.
+ 
++ ** listen: Listen to property parameter changes.
++
+ The following is a generally usable and reasonably safe example of an access control file.
+ It allows one to modify USB device authorization state (`Devices=modify`), list USB devices (`Devices=list`), listen to USB device related events (`Devices=listen`), list USB authorization policy rules (`Policy=list`) and listen to exception events (`Exceptions=listen`):
+ 
+diff --color -ru a/src/Library/public/usbguard/IPCServer.cpp b/src/Library/public/usbguard/IPCServer.cpp
+--- a/src/Library/public/usbguard/IPCServer.cpp	2020-11-23 15:56:12.979847655 +0100
++++ b/src/Library/public/usbguard/IPCServer.cpp	2021-10-14 12:39:11.954947277 +0200
+@@ -159,18 +159,25 @@
+       throw USBGUARD_BUG("Cannot set privileges for NONE section");
+     }
+ 
++    const uint8_t p = static_cast<uint8_t>(privilege);
++
+     if (section == Section::ALL) {
+-      for (const auto& value : {
++      for (const auto& s : {
+           Section::POLICY,
+           Section::PARAMETERS,
+           Section::EXCEPTIONS,
+           Section::DEVICES
+         }) {
+-        _access_control[value] |= static_cast<uint8_t>(privilege);
++        _access_control[s] |= p & ~ac_mask(s);
+       }
+     }
+     else {
+-      _access_control[section] |= static_cast<uint8_t>(privilege);
++      if (privilege != Privilege::ALL && (p & ac_mask(section))) {
++        throw std::runtime_error("Invalid privilege " +
++                privilegeToString(privilege) + " for section " +
++                sectionToString(section));
++      }
++      _access_control[section] |= p & ~ac_mask(section);
+     }
+   }
+ 
+@@ -254,6 +261,28 @@
+     merge(access_control);
+   }
+ 
++  uint8_t IPCServer::AccessControl::ac_mask(IPCServer::AccessControl::Section section) const
++  {
++    const uint8_t MODIFY = static_cast<uint8_t>(Privilege::MODIFY);
++    const uint8_t LIST = static_cast<uint8_t>(Privilege::LIST);
++    const uint8_t LISTEN = static_cast<uint8_t>(Privilege::LISTEN);
++
++    switch (section) {
++    case Section::DEVICES:
++      return ~(MODIFY | LIST | LISTEN);
++    case Section::POLICY:
++      return ~(MODIFY | LIST);
++    case Section::EXCEPTIONS:
++      return ~(LISTEN);
++    case Section::PARAMETERS:
++      return ~(MODIFY | LIST | LISTEN);
++    case Section::ALL:
++    case Section::NONE:
++    default:
++      return 0xff;
++    }
++  }
++
+   IPCServer::IPCServer()
+     : d_pointer(usbguard::make_unique<IPCServerPrivate>(*this))
+   {
+diff --color -ru a/src/Library/public/usbguard/IPCServer.hpp b/src/Library/public/usbguard/IPCServer.hpp
+--- a/src/Library/public/usbguard/IPCServer.hpp	2020-10-11 17:43:43.519295669 +0200
++++ b/src/Library/public/usbguard/IPCServer.hpp	2021-10-14 12:39:11.955947295 +0200
+@@ -278,6 +278,17 @@
+       };
+ 
+       /**
++       * @brief Get a privilege mask for given section
++       * 
++       * For example, if the section is POLICY that has privileges MODIFY
++       * and LIST, the mask would be ~(MODIFY | LIST)
++       *
++       * @param section Section for which the privilege mask should be returned
++       * @return Privilege mask for section
++       */
++      uint8_t ac_mask(Section section) const;
++
++      /**
+        * @brief Access control represented by unordered map of
+        * tuples (Section, 8b privileges).
+        *
