@@ -1,0 +1,27 @@
+diff -up usbguard-1.0.0/usbguard-selinux-0.0.3/usbguard.te.orig usbguard-1.0.0/usbguard-selinux-0.0.3/usbguard.te
+--- usbguard-1.0.0/usbguard-selinux-0.0.3/usbguard.te.orig	2022-08-24 16:14:30.810875871 +0200
++++ usbguard-1.0.0/usbguard-selinux-0.0.3/usbguard.te	2022-08-24 16:15:50.064906117 +0200
+@@ -100,7 +100,6 @@ logging_log_filetrans(usbguard_t, usbgua
+ 
+ logging_send_syslog_msg(usbguard_t)
+ 
+-dbus_system_domain(usbguard_t, usbguard_exec_t)
+ usbguard_ipc_access(usbguard_t)
+ 
+ tunable_policy(`usbguard_daemon_write_rules',`
+@@ -111,6 +110,15 @@ tunable_policy(`usbguard_daemon_write_co
+ 	rw_files_pattern(usbguard_t, usbguard_conf_t, usbguard_conf_t)
+ ')
+ 
++optional_policy(`
++	dbus_system_domain(usbguard_t, usbguard_exec_t)
++
++	optional_policy(`
++		policykit_dbus_chat(usbguard_t)
++	')
++')
++
++
+ # Allow confined users to communicate with usbguard over unix socket
+ optional_policy(`
+     gen_require(`

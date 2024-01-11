@@ -1,0 +1,11 @@
+diff -up ./usbguard-selinux-0.0.3/usbguard.te.selinux-read-dir ./usbguard-selinux-0.0.3/usbguard.te
+--- ./usbguard-selinux-0.0.3/usbguard.te.selinux-read-dir	2020-06-09 10:53:03.191977241 +0200
++++ ./usbguard-selinux-0.0.3/usbguard.te	2020-06-09 10:54:21.441965315 +0200
+@@ -81,6 +81,7 @@ list_dirs_pattern(usbguard_t,usbguard_co
+ read_files_pattern(usbguard_t,usbguard_conf_t,usbguard_conf_t)
+ dontaudit usbguard_t usbguard_conf_t:file write;
+ 
++list_dirs_pattern(usbguard_t,usbguard_rules_t,usbguard_rules_t)
+ read_files_pattern(usbguard_t,usbguard_conf_t,usbguard_rules_t)
+ 
+ manage_dirs_pattern(usbguard_t, usbguard_var_run_t, usbguard_var_run_t)

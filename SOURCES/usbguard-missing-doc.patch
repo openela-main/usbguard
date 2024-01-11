@@ -1,0 +1,43 @@
+diff -up usbguard-1.0.0/doc/man/example-allow-device.adoc.orig usbguard-1.0.0/doc/man/example-allow-device.adoc
+--- usbguard-1.0.0/doc/man/example-allow-device.adoc.orig	2022-11-28 12:00:26.695561514 +0100
++++ usbguard-1.0.0/doc/man/example-allow-device.adoc	2022-11-28 11:57:01.120457773 +0100
+@@ -0,0 +1,6 @@
++....
++    # Allow a device by ID(it is the very first number from the list-devices command output)
++    $ sudo usbguard allow-device 10
++    # Allow all devices named "Dell Wired Multimedia Keyboard"
++    $ sudo usbguard allow-device name \"Dell Wired Multimedia Keyboard\"
++....
+diff -up usbguard-1.0.0/doc/man/example-initial-policy.adoc.orig usbguard-1.0.0/doc/man/example-initial-policy.adoc
+--- usbguard-1.0.0/doc/man/example-initial-policy.adoc.orig	2022-11-28 12:00:31.781564080 +0100
++++ usbguard-1.0.0/doc/man/example-initial-policy.adoc	2022-11-28 11:57:25.353470002 +0100
+@@ -0,0 +1,7 @@
++....
++    $ sudo usbguard generate-policy > rules.conf
++    $ vi rules.conf
++    (review/modify the rule set)
++    $ sudo install -m 0600 -o root -g root rules.conf /etc/usbguard/rules.conf
++    $ sudo systemctl restart usbguard
++....
+diff -up usbguard-1.0.0/doc/man/footer.adoc.orig usbguard-1.0.0/doc/man/footer.adoc
+--- usbguard-1.0.0/doc/man/footer.adoc.orig	2022-11-28 11:54:21.495377220 +0100
++++ usbguard-1.0.0/doc/man/footer.adoc	2022-11-28 11:55:51.960422872 +0100
+@@ -0,0 +1,18 @@
++== BUGS
++If you find a bug in this software or if you'd like to request a feature to be implemented, please file a ticket at <https://github.com/USBGuard/usbguard/issues/new>.
++
++
++== AUTHOR
++USBGuard was originally written by Daniel Kopeček.
++Many people have contributed to it.
++
++
++== RESOURCES
++Main web site: <https://usbguard.github.io/>
++
++
++== COPYING
++Copyright © 2015-{docyear} Red Hat, Inc. +
++License GPLv2+: GNU GPL version 2 or later http://gnu.org/licenses/gpl.html. +
++This is free software: you are free to change and redistribute it.
++There is NO WARRANTY, to the extent permitted by law.
